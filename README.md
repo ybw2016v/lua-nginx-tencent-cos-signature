@@ -1,3 +1,56 @@
+# lua-nginx-tencent-cos-signature
+
+通过几项简单的修改，可以实现在无OpenResty的情况下，仅使用Ubuntu/Debian的nginx，在对nginx影响尽可能小的前提下，在包管理的框架下实现对生成腾讯云 COS 对象储存的[请求签名 (XML version)][docs]。
+
+## 几项改动
+
+1. 使用nginx自带的`hmac_sha1`计算函数替代OpenResty中的相关依赖库
+2. 使用包管理中一键安装的`lua-nginx-string`替代OpenResty中的相关依赖库
+3. 将`ACCESS_KEY_ID` 和 `SECRET_ACCESS_KEY`放置在nginx的配置而不是通过环境变量
+
+## 使用方法
+
+1. 安装必要的依赖
+
+```bash
+sudo apt install libnginx-mod-http-lua
+sudo apt install lua-nginx-string
+```
+
+2. 将`cos.lua`放置在`/etc/nginx/lua/`目录下(或其他能正常使用的目录)
+
+3. 写nginx配置文件，仅增加一个`server`即可
+
+```nginx
+server {
+        listen 443 ssl http2;
+        server_name a.neko.red;
+        ssl_certificate     /root/key/dog.pem;
+        ssl_certificate_key /root/key/dog.key;
+        add_header 'Access-Control-Allow-Origin' '*'; #跨域用
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE'; #跨域用
+        add_header 'Access-Control-Allow-Headers' 'Content-Type'; #跨域用
+        proxy_intercept_errors on;
+        location / {
+            set $cos_access_key "";#access_key
+            set $cos_secret_key "";#secret_key
+            rewrite_by_lua_file "/etc/nginx/lua/cos.lua";#脚本放置位置
+        }
+        # internal redirect
+        location @cos {
+            proxy_pass https://<bucketname-appid>.cos.ap-beijing.myqcloud.com; #backet访问地址
+            proxy_set_header   Host   <bucketname-appid>.cos.ap-beijing.myqcloud.com; #也可以换成自定义域名
+        }
+}
+```
+
+4. 检查配置文件并重启nginx
+
+```bash
+sudo nginx -t
+sudo nginx -s reload
+```
+
 # lua-resty-tencent-cos-signature
 
 
